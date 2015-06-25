@@ -121,6 +121,14 @@ def loadstructure(filename):
     f.close()
     return structure
 
+def getitems(query, params, cur, keyfield):
+    cur.execute(query, params)
+    result = {}
+    for item in cur.fetchall():
+        result[item[keyfield]] = copy.deepcopy(item)
+    cur.nextset()
+    return result
+
 db = connect(host='localhost', user='root', passwd='2360087', db='information_schema')
 cur = db.cursor(cursors.DictCursor)
 
@@ -135,19 +143,17 @@ cur.nextset()
 tables = {}
 
 for table in tables_rows:
-    cur.execute('select * from columns where table_name=%s order by ordinal_position asc',[table['TABLE_NAME']])
-    column_rows = cur.fetchall()
     tables[table['TABLE_NAME']] = table
-    columns = {}
-    for column in column_rows:
-        columns[column['COLUMN_NAME']] = copy.deepcopy(column)
-    table['COLUMNS'] = columns
-    cur.nextset()
+    table['COLUMNS'] = getitems('select * from columns where table_name=%s', [table['TABLE_NAME']], cur, 'COLUMN_NAME')
+    table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_name=%s', [table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
+
 
 checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
+ignore = [[u'TABLES', u'CREATE_TIME']]
 
 newrows = json.loads(json.dumps(tables, cls=DateTimeEncoder), cls=DateTimeDecoder)
 
+#savestructure('./structure_test.json', newrows)
 
 newrows2 = loadstructure('./structure_test.json')
 
@@ -158,8 +164,8 @@ d.dictdiff(newrows2, newrows,  0, [u'TABLES'])
 
 
 for diff in d.diffs:
-    #if diff['keyschain'][0::2] in checkparameters:
-    print d.formatdiff(diff)
+    if diff['keyschain'][0::2] not in ignore:
+        print d.formatdiff(diff)
 
 
 
