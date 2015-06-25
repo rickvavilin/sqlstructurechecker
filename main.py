@@ -60,6 +60,15 @@ class Differ():
     def __init__(self):
         self.diffs = []
 
+    def formatkeyschain(self, kc):
+        return ' => '.join(kc)
+
+    def formatdiff(self, diff):
+        if diff['difftype'] == 'added' or diff['difftype'] == 'removed':
+            return '{} {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'])
+        else:
+            return '{} {} values: {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'], ', '.join([ unicode(v) for v in diff['values']]))
+
     def creatediff(self, i1, i2, keyschain, difftype):
         return {'keyschain': keyschain, 'difftype': difftype, 'values': [i1, i2]}
 
@@ -135,17 +144,10 @@ for table in tables_rows:
     table['COLUMNS'] = columns
     cur.nextset()
 
+checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
 
 newrows = json.loads(json.dumps(tables, cls=DateTimeEncoder), cls=DateTimeDecoder)
 
-#print json.dumps(tables, cls=DateTimeEncoder, indent=True)
-
-#savestructure('./structure_test.json', tables)
-#newrows2 = json.loads(json.dumps(tables, cls=DateTimeEncoder), cls=DateTimeDecoder)
-
-#f = open('./structure_test.json', 'r')
-#newrows2 = json.loads(f.read(), cls=DateTimeDecoder)
-#f.close()
 
 newrows2 = loadstructure('./structure_test.json')
 
@@ -154,8 +156,10 @@ d = Differ()
 
 d.dictdiff(newrows2, newrows,  0, [u'TABLES'])
 
-prettyprint.pp(d.diffs)
 
+for diff in d.diffs:
+    #if diff['keyschain'][0::2] in checkparameters:
+    print d.formatdiff(diff)
 
 
 
