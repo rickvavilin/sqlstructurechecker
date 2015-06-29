@@ -134,7 +134,9 @@ cur = db.cursor(cursors.DictCursor)
 
 cur.execute("SET CHARSET 'utf8'")
 
-cur.execute('select * from tables where table_schema=%s;', ['structure_test'])
+database_name = 'structure_test'
+
+cur.execute('select * from tables where table_schema=%s;', [datebase_name])
 
 tables_rows = cur.fetchall()
 
@@ -146,10 +148,11 @@ for table in tables_rows:
     tables[table['TABLE_NAME']] = table
     table['COLUMNS'] = getitems('select * from columns where table_name=%s', [table['TABLE_NAME']], cur, 'COLUMN_NAME')
     table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_name=%s', [table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
+    table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema and event_object_table=%s', [table['TABLE_NAME']], cur, 'TRIGGER_NAME')
 
 
 checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
-ignore = [[u'TABLES', u'CREATE_TIME']]
+ignore = [[u'TABLES', u'CREATE_TIME'], [u'TABLES', u'DATA_FREE'], [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION']]
 
 newrows = json.loads(json.dumps(tables, cls=DateTimeEncoder), cls=DateTimeDecoder)
 
