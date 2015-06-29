@@ -176,7 +176,6 @@ def compare_file_vs_database(args):
     compare(loadstructure(args.input), get_structure_from_database(**vars(args)))
 
 def compare(loaded_struct, parsed_struct):
-    checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
     ignore = [[u'TABLES', u'CREATE_TIME'],
               [u'TABLES', u'DATA_FREE'],
               [u'TABLES', u'DATA_LENGTH'],
@@ -188,7 +187,6 @@ def compare(loaded_struct, parsed_struct):
               [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION'],
               [u'ROUTINES', u'CREATED'],
               [u'ROUTINES', u'LAST_ALTERED'],
-
     ]
 
     d = Differ()
@@ -205,27 +203,26 @@ def compare(loaded_struct, parsed_struct):
             f2.close()
 
 
+if __name__ == '__main__':
+    commands = {"dump": dump_from_db_to_file,
+                "compare": compare_file_vs_database,
+                "filecompare": compare_files
+                }
+
+    parser = argparse.ArgumentParser(description='SQL structure checker')
+    parser.add_argument("command", choices=list(commands))
+    parser.add_argument("--host", "-H", metavar='HOST', default='localhost')
+    parser.add_argument("--port", "-P", metavar='PORT', default=3306)
+    parser.add_argument("--user", metavar='USER', default='root')
+    parser.add_argument("--passwd", metavar='PASSWD', default='2360087')
+    parser.add_argument("--database", "-D", metavar='DATABASE')
+    parser.add_argument("--output", metavar='output filename')
+    parser.add_argument("--input", metavar='input filename')
+    parser.add_argument("--input2", metavar='input filename')
 
 
-commands = {"dump": dump_from_db_to_file,
-            "compare": compare_file_vs_database,
-            "filecompare": compare_files
-            }
-
-parser = argparse.ArgumentParser(description='SQL structure checker')
-parser.add_argument("command", choices=list(commands))
-parser.add_argument("--host", "-H", metavar='HOST', default='localhost')
-parser.add_argument("--port", "-P", metavar='PORT', default=3306)
-parser.add_argument("--user", metavar='USER', default='root')
-parser.add_argument("--passwd", metavar='PASSWD', default='2360087')
-parser.add_argument("--database", "-D", metavar='DATABASE')
-parser.add_argument("--output", metavar='output filename')
-parser.add_argument("--input", metavar='input filename')
-parser.add_argument("--input2", metavar='input filename')
-
-
-args = parser.parse_args()
-commands[args.command](args)
+    args = parser.parse_args()
+    commands[args.command](args)
 
 
 
