@@ -64,10 +64,10 @@ class Differ():
         return ' => '.join(kc)
 
     def formatdiff(self, diff):
-        if diff['difftype'] == 'added' or diff['difftype'] == 'removed':
-            return '{} {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'])
+        if diff['difftype'] == u'added' or diff['difftype'] == u'removed':
+            return u'{} {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'])
         else:
-            return '{} {} values: {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'], ', '.join([ unicode(v) for v in diff['values']]))
+            return u'{} {} values: {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'], u', '.join([ unicode(v) for v in diff['values']]))
 
     def creatediff(self, i1, i2, keyschain, difftype):
         return {'keyschain': keyschain, 'difftype': difftype, 'values': [i1, i2]}
