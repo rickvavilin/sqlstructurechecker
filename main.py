@@ -7,7 +7,7 @@ import json
 from json import JSONDecoder
 from json import JSONEncoder
 import argparse
-
+import codecs
 
 
 class DateTimeDecoder(json.JSONDecoder):
@@ -67,7 +67,7 @@ class Differ():
         if diff['difftype'] == u'added' or diff['difftype'] == u'removed':
             return u'{} {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'])
         else:
-            return u'{} {} values: {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'], u', '.join([ unicode(v) for v in diff['values']]))
+            return u'{} {} values: {}'.format(self.formatkeyschain(diff['keyschain']), diff['difftype'], u', '.join([unicode(v)[:80].strip() for v in diff['values']]))
 
     def creatediff(self, i1, i2, keyschain, difftype):
         return {'keyschain': keyschain, 'difftype': difftype, 'values': [i1, i2]}
@@ -186,6 +186,13 @@ def compare(loaded_struct, parsed_struct):
     for diff in d.diffs:
         if diff['keyschain'][0::2] not in ignore:
             print d.formatdiff(diff)
+        if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION']:
+            f1 = codecs.open('old/'+diff['keyschain'][1]+'.sql', 'wb', encoding='utf-8')
+            f1.write(unicode(diff['values'][0]))
+            f1.close()
+            f2 = codecs.open('new/'+diff['keyschain'][1]+'.sql', 'wb', encoding='utf-8')
+            f2.write(unicode(diff['values'][1]))
+            f2.close()
 
 
 
