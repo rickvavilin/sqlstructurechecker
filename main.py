@@ -146,8 +146,14 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
+    cur.execute('select * from routines where routine_schema=%s', [database_name])
+    routines_rows = cur.fetchall()
+    routines = {}
+    for routine in routines_rows:
+        routines[routine['ROUTINE_NAME']] = routine
+        routine['PARAMETERS'] = getitems('select * from parameters where specific_schema=%s and specific_name=%s', [database_name, routine['ROUTINE_NAME']], cur, 'PARAMETER_NAME')
     db.close()
-    return normalize(tables)
+    return normalize({u'TABLES': tables, u'ROUTINES': routines})
 
 
 def dump_from_db_to_file(args):
@@ -169,10 +175,14 @@ def compare(loaded_struct, parsed_struct):
               [u'TABLES', u'AUTO_INCREMENT'],
               [u'TABLES', u'AVG_ROW_LENGTH'],
               [u'TABLES', u'UPDATE_TIME'],
-              [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION']]
+              [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION'],
+              [u'ROUTINES', u'CREATED'],
+              [u'ROUTINES', u'LAST_ALTERED'],
+
+    ]
 
     d = Differ()
-    d.dictdiff(loaded_struct, parsed_struct,  0, [u'TABLES'])
+    d.dictdiff(loaded_struct, parsed_struct,  0, [])
     for diff in d.diffs:
         if diff['keyschain'][0::2] not in ignore:
             print d.formatdiff(diff)
