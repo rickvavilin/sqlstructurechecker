@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 from json import JSONDecoder
 from json import JSONEncoder
-import prettyprint
+import argparse
 
 
 
@@ -129,46 +129,81 @@ def getitems(query, params, cur, keyfield):
     cur.nextset()
     return result
 
-db = connect(host='localhost', user='root', passwd='2360087', db='information_schema')
-cur = db.cursor(cursors.DictCursor)
+def normalize(structure):
+    return json.loads(json.dumps(structure, cls=DateTimeEncoder), cls=DateTimeDecoder)
 
-cur.execute("SET CHARSET 'utf8'")
-
-database_name = 'structure_test'
-
-cur.execute('select * from tables where table_schema=%s;', [datebase_name])
-
-tables_rows = cur.fetchall()
-
-cur.nextset()
-
-tables = {}
-
-for table in tables_rows:
-    tables[table['TABLE_NAME']] = table
-    table['COLUMNS'] = getitems('select * from columns where table_name=%s', [table['TABLE_NAME']], cur, 'COLUMN_NAME')
-    table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_name=%s', [table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
-    table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema and event_object_table=%s', [table['TABLE_NAME']], cur, 'TRIGGER_NAME')
-
-
-checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
-ignore = [[u'TABLES', u'CREATE_TIME'], [u'TABLES', u'DATA_FREE'], [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION']]
-
-newrows = json.loads(json.dumps(tables, cls=DateTimeEncoder), cls=DateTimeDecoder)
-
-#savestructure('./structure_test.json', newrows)
-
-newrows2 = loadstructure('./structure_test.json')
+def get_structure_from_database(host='localhost', user='root', passwd='2360087', database=None, **kwargs):
+    db = connect(host=host, user=user, passwd=passwd, db='information_schema')
+    cur = db.cursor(cursors.DictCursor)
+    cur.execute("SET CHARSET 'utf8'")
+    database_name = database
+    cur.execute('select * from tables where table_schema=%s;', [database_name])
+    tables_rows = cur.fetchall()
+    cur.nextset()
+    tables = {}
+    for table in tables_rows:
+        tables[table['TABLE_NAME']] = table
+        table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
+        table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
+        table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
+    db.close()
+    return normalize(tables)
 
 
-d = Differ()
+def dump_from_db_to_file(args):
+    savestructure(args.output, get_structure_from_database(**vars(args)))
 
-d.dictdiff(newrows2, newrows,  0, [u'TABLES'])
+def compare_files(args):
+    compare(loadstructure(args.input), loadstructure(args.input2))
+
+def compare_file_vs_database(args):
+    compare(loadstructure(args.input), get_structure_from_database(**vars(args)))
+
+def compare(loaded_struct, parsed_struct):
+    checkparameters = [[u'TABLES', u'COLUMNS', u'COLUMN_TYPE'], [u'TABLES', u'COLUMNS']]
+    ignore = [[u'TABLES', u'CREATE_TIME'],
+              [u'TABLES', u'DATA_FREE'],
+              [u'TABLES', u'DATA_LENGTH'],
+              [u'TABLES', u'INDEX_LENGTH'],
+              [u'TABLES', u'TABLE_ROWS'],
+              [u'TABLES', u'AUTO_INCREMENT'],
+              [u'TABLES', u'AVG_ROW_LENGTH'],
+              [u'TABLES', u'UPDATE_TIME'],
+              [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION']]
+
+    d = Differ()
+    d.dictdiff(loaded_struct, parsed_struct,  0, [u'TABLES'])
+    for diff in d.diffs:
+        if diff['keyschain'][0::2] not in ignore:
+            print d.formatdiff(diff)
 
 
-for diff in d.diffs:
-    if diff['keyschain'][0::2] not in ignore:
-        print d.formatdiff(diff)
+
+
+commands = {"dump": dump_from_db_to_file,
+            "compare": compare_file_vs_database,
+            "filecompare": compare_files
+            }
+
+parser = argparse.ArgumentParser(description='SQL structure checker')
+parser.add_argument("command", choices=list(commands))
+parser.add_argument("--host", "-H", metavar='HOST', default='localhost')
+parser.add_argument("--port", "-P", metavar='PORT', default=3306)
+parser.add_argument("--user", metavar='USER', default='root')
+parser.add_argument("--passwd", metavar='PASSWD', default='2360087')
+parser.add_argument("--database", "-D", metavar='DATABASE')
+parser.add_argument("--output", metavar='output filename')
+parser.add_argument("--input", metavar='input filename')
+parser.add_argument("--input2", metavar='input filename')
+
+
+args = parser.parse_args()
+commands[args.command](args)
+
+
+
+
+
 
 
 
