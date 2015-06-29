@@ -97,6 +97,13 @@ class Differ():
             elif i < len(l2):
                 self.diffs.append(self.creatediff(None, None, keyschain+[i], 'added'))
 
+    def structdiff(self, s1, s2):
+        self.diffs = []
+        self.dictdiff(s1, s2, 0, [])
+
+    def filtereddiff(self, ignore):
+        return filter(lambda x: x['keyschain'][0::2] not in ignore, self.diffs)
+
 
 def savestructure(filename, structure):
     f = open(filename, 'w')
@@ -196,9 +203,9 @@ def compare(loaded_struct, parsed_struct):
     ]
 
     d = Differ()
-    d.dictdiff(loaded_struct, parsed_struct,  0, [])
+    d.structdiff(loaded_struct, parsed_struct)
 
-    filtered_diffs = filter(lambda x: x['keyschain'][0::2] not in ignore, d.diffs)
+    filtered_diffs = d.filtereddiff(ignore)
     if len(filtered_diffs) == 0:
         print 'No differences found'
 
