@@ -1,11 +1,8 @@
 __author__ = 'Aleksandr Vavilin'
 from MySQLdb import connect, cursors
-import tabulate
 import copy
 from datetime import datetime
 import json
-from json import JSONDecoder
-from json import JSONEncoder
 import argparse
 import codecs
 
@@ -13,7 +10,7 @@ import codecs
 class DateTimeDecoder(json.JSONDecoder):
 
     def __init__(self, *args, **kargs):
-        JSONDecoder.__init__(self, object_hook=self.dict_to_object,
+        json.JSONDecoder.__init__(self, object_hook=self.dict_to_object,
                              *args, **kargs)
 
     def dict_to_object(self, d):
@@ -28,7 +25,7 @@ class DateTimeDecoder(json.JSONDecoder):
             d['__type__'] = type
             return d
 
-class DateTimeEncoder(JSONEncoder):
+class DateTimeEncoder(json.JSONEncoder):
     """ Instead of letting the default encoder convert datetime to string,
         convert datetime objects into a dict, which can be decoded by the
         DateTimeDecoder
@@ -47,16 +44,13 @@ class DateTimeEncoder(JSONEncoder):
                 'microsecond' : obj.microsecond,
             }
         else:
-            return JSONEncoder.default(self, obj)
+            return json.JSONEncoder.default(self, obj)
 
-
-def printcur(cur):
-    print tabulate.tabulate(cur.fetchall(), headers={d[0]:d[0] for d in cur.description})
-
-def getindent(level):
-    return ' '*level*4
 
 class Differ():
+    """
+    Differ is class, that compute 
+    """
     def __init__(self):
         self.diffs = []
 
