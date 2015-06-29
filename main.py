@@ -146,14 +146,24 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
+
     cur.execute('select * from routines where routine_schema=%s', [database_name])
     routines_rows = cur.fetchall()
     routines = {}
     for routine in routines_rows:
         routines[routine['ROUTINE_NAME']] = routine
         routine['PARAMETERS'] = getitems('select * from parameters where specific_schema=%s and specific_name=%s', [database_name, routine['ROUTINE_NAME']], cur, 'PARAMETER_NAME')
+    cur.nextset()
+
+    cur.execute('select * from views where table_schema=%s', [database_name])
+    views_rows = cur.fetchall()
+    views = {}
+    for view in views_rows:
+        views[view['TABLE_NAME']] = view
+    cur.nextset()
+
     db.close()
-    return normalize({u'TABLES': tables, u'ROUTINES': routines})
+    return normalize({u'TABLES': tables, u'ROUTINES': routines, u'VIEWS': views})
 
 
 def dump_from_db_to_file(args):
