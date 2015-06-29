@@ -197,9 +197,13 @@ def compare(loaded_struct, parsed_struct):
 
     d = Differ()
     d.dictdiff(loaded_struct, parsed_struct,  0, [])
-    for diff in d.diffs:
-        if diff['keyschain'][0::2] not in ignore:
-            print d.formatdiff(diff)
+
+    filtered_diffs = filter(lambda x: x['keyschain'][0::2] not in ignore, d.diffs)
+    if len(filtered_diffs) == 0:
+        print 'No differences found'
+
+    for diff in filtered_diffs:
+        print d.formatdiff(diff)
         if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION']:
             f1 = codecs.open('old/'+diff['keyschain'][1]+'.sql', 'wb', encoding='utf-8')
             f1.write(unicode(diff['values'][0]))
