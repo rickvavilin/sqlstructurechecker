@@ -7,6 +7,7 @@ import argparse
 import codecs
 
 
+
 class DateTimeDecoder(json.JSONDecoder):
 
     def __init__(self, *args, **kargs):
@@ -211,11 +212,11 @@ def compare(loaded_struct, parsed_struct):
 
     for diff in filtered_diffs:
         print d.formatdiff(diff)
-        if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION']:
-            f1 = codecs.open('old/'+diff['keyschain'][1]+'.sql', 'wb', encoding='utf-8')
+        if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION'] or diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS', u'ACTION_STATEMENT'] :
+            f1 = codecs.open('old/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
             f1.write(unicode(diff['values'][0]))
             f1.close()
-            f2 = codecs.open('new/'+diff['keyschain'][1]+'.sql', 'wb', encoding='utf-8')
+            f2 = codecs.open('new/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
             f2.write(unicode(diff['values'][1]))
             f2.close()
 
