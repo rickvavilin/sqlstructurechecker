@@ -3,6 +3,7 @@ from distutils.core import setup
 setup(
     name='sqlstructurecomparer',
     version='0.1',
+    requires=['MySQL_python'],
     packages=['sqlcomparer'],
     url='',
     license='',
