@@ -15,7 +15,7 @@ def compare_file_vs_database(args):
 
 def compare(loaded_struct, parsed_struct):
     ignore = sqlcomparer.default_ignore
-
+    alters = []
     d = sqlcomparer.Differ()
     d.structdiff(loaded_struct, parsed_struct)
 
@@ -24,7 +24,71 @@ def compare(loaded_struct, parsed_struct):
         print 'No differences found'
 
     for diff in filtered_diffs:
-        if diff['keyschain'][0::2] == [u'TABLES']
+        if diff['keyschain'][0::2][:2] == [u'TABLES']:
+            if diff['difftype']==u'removed':
+                a = 'DROP TABLE {};'.format(diff['keyschain'][1])
+                if a not in alters:
+                    alters.append(a)
+
+        if diff['keyschain'][0::2][:2] == [u'TABLES', u'COLUMNS']:
+            if diff['difftype']==u'added':
+                col_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+                notnull = ''
+                if col_define[u'IS_NULLABLE']==u'NO':
+                    notnull = 'NOT NULL'
+                default = ''
+                if col_define[u'COLUMN_DEFAULT'] is not None:
+                    try:
+                        default = 'DEFAULT {}'.format(int(col_define[u'COLUMN_DEFAULT']))
+                    except:
+                        try:
+                            default = 'DEFAULT {}'.format(float(col_define[u'COLUMN_DEFAULT']))
+                        except:
+                            default = 'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
+                charset = ''
+                if col_define[u'CHARACTER_SET_NAME'] is not None:
+                    charset = 'CHARACTER SET {}'.format(col_define[u'CHARACTER_SET_NAME'])
+                collate = ''
+                if col_define[u'COLLATION_NAME'] is not None:
+                    collate = 'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
+
+                #print col_define
+                a = 'ALTER TABLE {} ADD COLUMN {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default)
+                if a not in alters:
+                    alters.append(a)
+            if diff['difftype']==u'removed':
+                a = 'ALTER TABLE {} DROP COLUMN {};'.format(diff['keyschain'][1], diff['keyschain'][3])
+                if a not in alters:
+                    alters.append(a)
+
+            if diff['difftype']==u'differ':
+                col_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+                notnull = ''
+                if col_define[u'IS_NULLABLE']==u'NO':
+                    notnull = 'NOT NULL'
+                default = ''
+                if col_define[u'COLUMN_DEFAULT'] is not None:
+                    try:
+                        default = 'DEFAULT {}'.format(int(col_define[u'COLUMN_DEFAULT']))
+                    except:
+                        try:
+                            default = 'DEFAULT {}'.format(float(col_define[u'COLUMN_DEFAULT']))
+                        except:
+                            default = 'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
+
+                charset = ''
+                if col_define[u'CHARACTER_SET_NAME'] is not None:
+                    charset = 'CHARACTER SET {}'.format(col_define[u'CHARACTER_SET_NAME'])
+                collate = ''
+                if col_define[u'COLLATION_NAME'] is not None:
+                    collate = 'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
+                a = 'ALTER TABLE {} MODIFY COLUMN {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default)
+                if a not in alters:
+                    alters.append(a)
+        if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'COLUMN_KEY']:
+            if diff['values'][0]=='' and diff['values'][1]=='MUL':
+                print 'ADD KEY'
+
         if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION'] or diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS', u'ACTION_STATEMENT'] :
             if diff['values'][0].replace('\x0D\x0A', '\x0A')!=diff['values'][1].replace('\x0D\x0A', '\x0A'):
                 f1 = codecs.open('old/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
@@ -36,6 +100,8 @@ def compare(loaded_struct, parsed_struct):
             else:
                 continue
         print d.formatdiff(diff)
+    for alter in alters:
+        print alter
 
 if __name__ == '__main__':
     commands = {"dump": dump_from_db_to_file,
