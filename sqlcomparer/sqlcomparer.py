@@ -12,9 +12,19 @@ default_ignore = [[u'TABLES', u'CREATE_TIME'],
               [u'TABLES', u'AUTO_INCREMENT'],
               [u'TABLES', u'AVG_ROW_LENGTH'],
               [u'TABLES', u'UPDATE_TIME'],
+              [u'TABLES', u'TABLE_SCHEMA'],
               [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION'],
+              [u'TABLES', u'TRIGGERS', u'TRIGGER_SCHEMA'],
+              [u'TABLES', u'TRIGGERS', u'EVENT_OBJECT_SCHEMA'],
+              [u'TABLES', u'COLUMNS', u'TABLE_SCHEMA'],
+              [u'TABLES', u'CONSTRAINTS', u'TABLE_SCHEMA'],
+              [u'TABLES', u'CONSTRAINTS', u'CONSTRAINT_SCHEMA'],
+              [u'TABLES', u'REF_CONSTRAINTS', u'CONSTRAINT_SCHEMA'],
+              [u'TABLES', u'REF_CONSTRAINTS', u'UNIQUE_CONSTRAINT_SCHEMA'],
               [u'ROUTINES', u'CREATED'],
               [u'ROUTINES', u'LAST_ALTERED'],
+              [u'ROUTINES', u'PARAMETERS', u'SPECIFIC_SCHEMA'],
+              [u'ROUTINES', u'ROUTINE_SCHEMA'],
     ]
 
 
@@ -148,7 +158,7 @@ def normalize(structure):
     return json.loads(json.dumps(structure, cls=DateTimeEncoder), cls=DateTimeDecoder)
 
 
-def get_structure_from_database(host='localhost', user='root', passwd='2360087', database=None, **kwargs):
+def get_structure_from_database(host='localhost', user='root', passwd='2360087', port=3306, database=None, **kwargs):
     """
     :param host: hostname for database connection
     :param user: username for database connection
@@ -157,7 +167,7 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
     :param kwargs: for compatibility
     :return: structure of database metadata, include TABLES, VIEWS, CONSTRAINTS, ROUTINES
     """
-    db = connect(host=host, user=user, passwd=passwd, db='information_schema')
+    db = connect(host=host, user=user, passwd=passwd, db='information_schema', port=int(port))
     cur = db.cursor(cursors.DictCursor)
     cur.execute("SET CHARSET 'utf8'")
     database_name = database
@@ -166,6 +176,7 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
     cur.nextset()
     tables = {}
     for table in tables_rows:
+        print table['TABLE_NAME']
         tables[table['TABLE_NAME']] = table
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
