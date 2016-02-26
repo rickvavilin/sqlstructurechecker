@@ -172,7 +172,7 @@ def getindexes(query, params, cur, keyfield):
 
 
 def dump_routine(cur, database, proctype, proc):
-    print """SHOW CREATE {} {}.{};""".format(proctype, database,  proc)
+    #print """SHOW CREATE {} {}.{};""".format(proctype, database,  proc)
     cur.execute("""SHOW CREATE {} {}.{};""".format(proctype, database,  proc))
     f = 'Create Procedure'
     if proctype=='FUNCTION':
@@ -203,7 +203,6 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
     cur.nextset()
     tables = {}
     for table in tables_rows:
-        print table['TABLE_NAME']
         tables[table['TABLE_NAME']] = table
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')

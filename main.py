@@ -1,3 +1,4 @@
+# coding=utf-8
 __author__ = 'Aleksandr Vavilin'
 import sqlcomparer
 import argparse
@@ -17,6 +18,7 @@ def compare(loaded_struct, parsed_struct):
     ignore = sqlcomparer.default_ignore
     alters = []
     idx_alters = []
+    proc_alters = []
     d = sqlcomparer.Differ()
     d.structdiff(loaded_struct, parsed_struct)
 
@@ -31,7 +33,8 @@ def compare(loaded_struct, parsed_struct):
                 if a not in alters:
                     alters.append(a)
 
-        if diff['keyschain'][0::2][:2] == [u'TABLES', u'COLUMNS'] and diff['keyschain'][0::2][:3] != [u'TABLES', u'COLUMNS', u'COLUMN_KEY']:
+        if diff['keyschain'][0::2][:2] == [u'TABLES', u'COLUMNS'] \
+                and diff['keyschain'][0::2][:3] != [u'TABLES', u'COLUMNS', u'COLUMN_KEY']:
             if diff['difftype']==u'added':
                 col_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
                 notnull = ''
@@ -69,6 +72,12 @@ def compare(loaded_struct, parsed_struct):
 
             if diff['difftype']==u'differ':
                 col_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+
+                after = ''
+                if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'ORDINAL_POSITION']:
+                    pass
+
+
                 notnull = ''
                 if col_define[u'IS_NULLABLE']==u'NO':
                     notnull = 'NOT NULL'
@@ -82,7 +91,7 @@ def compare(loaded_struct, parsed_struct):
                 collate = ''
                 if col_define[u'COLLATION_NAME'] is not None:
                     collate = 'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
-                a = 'ALTER TABLE {} MODIFY COLUMN {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default)
+                a = 'ALTER TABLE {} MODIFY COLUMN {} {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default, after)
                 if a not in alters:
                     alters.append(a)
         '''
@@ -131,7 +140,6 @@ def compare(loaded_struct, parsed_struct):
         if diff['keyschain'][0::2][:2] == [u'TABLES', u'FOREIGN_KEYS']:
             if diff['difftype']==u'added':
                 const_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
-                print const_define
                 a = 'ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) REFERENCES {} ({});'.format(diff['keyschain'][1], diff['keyschain'][3], const_define['column_name'], const_define['referenced_table_name'], const_define['referenced_column_name'])
                 if a not in alters:
                     idx_alters.append('SET foreign_key_checks = 0;')
@@ -146,6 +154,7 @@ def compare(loaded_struct, parsed_struct):
                 f1.close()
                 f2 = codecs.open('new/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
                 #f2.write(unicode(diff['values'][1]))
+                proc_alters.append(unicode(parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
                 f2.write(unicode(parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
                 f2.close()
             else:
@@ -162,9 +171,6 @@ def compare(loaded_struct, parsed_struct):
         #        const_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
         #        if const_define[u'CONSTRAINT_TYPE']==u'UNIQUE':
         #            a = 'ALTER TABLE {} ADD UNIQUE KEY {} ({});'.format(diff['keyschain'][1],
-
-
-
         print d.formatdiff(diff)
 
     alters_f = open('./alters.sql','w')
@@ -172,6 +178,9 @@ def compare(loaded_struct, parsed_struct):
         alters_f.write(alter+'\n')
     for alter in idx_alters:
         alters_f.write(alter+'\n')
+    for alter in proc_alters:
+        alters_f.write(alter+'\n')
+
 
 if __name__ == '__main__':
     commands = {"dump": dump_from_db_to_file,
