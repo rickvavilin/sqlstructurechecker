@@ -134,7 +134,9 @@ def compare(loaded_struct, parsed_struct):
                 print const_define
                 a = 'ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) REFERENCES {} ({});'.format(diff['keyschain'][1], diff['keyschain'][3], const_define['column_name'], const_define['referenced_table_name'], const_define['referenced_column_name'])
                 if a not in alters:
+                    idx_alters.append('SET foreign_key_checks = 0;')
                     idx_alters.append(a)
+                    idx_alters.append('SET foreign_key_checks = 1;')
 
         if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION'] or diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS', u'ACTION_STATEMENT']:
             if diff['values'][0].replace('\x0D\x0A', '\x0A')!=diff['values'][1].replace('\x0D\x0A', '\x0A'):
@@ -164,10 +166,12 @@ def compare(loaded_struct, parsed_struct):
 
 
         print d.formatdiff(diff)
+
+    alters_f = open('./alters.sql','w')
     for alter in alters:
-        print alter
+        alters_f.write(alter+'\n')
     for alter in idx_alters:
-        print alter
+        alters_f.write(alter+'\n')
 
 if __name__ == '__main__':
     commands = {"dump": dump_from_db_to_file,
