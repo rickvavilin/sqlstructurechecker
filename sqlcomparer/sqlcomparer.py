@@ -25,6 +25,7 @@ default_ignore = [[u'TABLES', u'CREATE_TIME'],
               [u'ROUTINES', u'LAST_ALTERED'],
               [u'ROUTINES', u'PARAMETERS', u'SPECIFIC_SCHEMA'],
               [u'ROUTINES', u'ROUTINE_SCHEMA'],
+              [u'TABLES', u'INDEXES', u'Cardinality'],
     ]
 
 
@@ -77,7 +78,7 @@ class Differ():
         self.diffs = []
 
     def formatkeyschain(self, kc):
-        return ' => '.join(kc)
+        return ' => '.join([unicode(k) for k in kc])
 
     def formatdiff(self, diff):
         if diff['difftype'] == u'added' or diff['difftype'] == u'removed':
@@ -153,6 +154,32 @@ def getitems(query, params, cur, keyfield):
     cur.nextset()
     return result
 
+def getindexes(query, params, cur, keyfield):
+    cur.execute(query, params)
+    result = {}
+    for item in cur.fetchall():
+        idx = copy.deepcopy(item)
+
+        if item[keyfield] not in result:
+            result[item[keyfield]] = idx
+            result[item[keyfield]]['COLUMNS'] = [idx['Column_name']]
+            del result[item[keyfield]]['Column_name']
+        else:
+            result[item[keyfield]]['COLUMNS'].append(idx['Column_name'])
+
+    cur.nextset()
+    return result
+
+
+def dump_routine(cur, database, proctype, proc):
+    print """SHOW CREATE {} {}.{};""".format(proctype, database,  proc)
+    cur.execute("""SHOW CREATE {} {}.{};""".format(proctype, database,  proc))
+    f = 'Create Procedure'
+    if proctype=='FUNCTION':
+        f = 'Create Function'
+    pdef = "DROP {} IF EXISTS {};\nDELIMITER $$\n".format(proctype, proc) + cur.fetchall()[0][f] + "\n$$"
+    return pdef
+
 
 def normalize(structure):
     return json.loads(json.dumps(structure, cls=DateTimeEncoder), cls=DateTimeDecoder)
@@ -182,13 +209,17 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['REF_CONSTRAINTS'] = getitems('select * from REFERENTIAL_CONSTRAINTS where constraint_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
+        table['FOREIGN_KEYS'] = getitems('select CONSTRAINT_NAME , column_name,  referenced_table_name, referenced_column_name from key_column_usage where referenced_table_name is not null and table_schema = %s and table_name = %s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME');
+        table['INDEXES'] = getindexes('SHOW INDEX FROM {}.{}'.format(database_name, table['TABLE_NAME']),[], cur, 'Key_name')
 
-    cur.execute('select * from routines where routine_schema=%s', [database_name])
+
+        cur.execute('select * from routines where routine_schema=%s', [database_name])
     routines_rows = cur.fetchall()
     routines = {}
     for routine in routines_rows:
         routines[routine['ROUTINE_NAME']] = routine
         routine['PARAMETERS'] = getitems('select * from parameters where specific_schema=%s and specific_name=%s', [database_name, routine['ROUTINE_NAME']], cur, 'PARAMETER_NAME')
+        routine['CREATE'] = dump_routine(cur,database_name,routine['ROUTINE_TYPE'], routine['ROUTINE_NAME'])
     cur.nextset()
 
     cur.execute('select * from views where table_schema=%s', [database_name])
