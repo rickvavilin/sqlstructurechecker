@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 
 default_ignore = [[u'TABLES', u'CREATE_TIME'],
+              [u'TABLES', u'CREATE'],
               [u'TABLES', u'DATA_FREE'],
               [u'TABLES', u'DATA_LENGTH'],
               [u'TABLES', u'INDEX_LENGTH'],
@@ -177,7 +178,21 @@ def dump_routine(cur, database, proctype, proc):
     f = 'Create Procedure'
     if proctype=='FUNCTION':
         f = 'Create Function'
-    pdef = "DROP {} IF EXISTS {};\nDELIMITER $$\n".format(proctype, proc) + cur.fetchall()[0][f] + "\n$$"
+    pdef = "DROP {} IF EXISTS {};\nDELIMITER $$\n".format(proctype, proc) + cur.fetchall()[0][f] + "\n$$\nDELIMITER ;\n"
+    return pdef
+
+def dump_trigger(cur, database, trigger):
+    #print """SHOW CREATE {} {}.{};""".format(proctype, database,  proc)
+    cur.execute("""SHOW CREATE TRIGGER {}.{};""".format(database,  trigger))
+    f = 'SQL Original Statement'
+    pdef = "DROP TRIGGER IF EXISTS {};\nDELIMITER $$\n".format(trigger) + cur.fetchall()[0][f] + "\n$$\nDELIMITER ;\n"
+    return pdef
+
+def dump_table(cur, database, table):
+    #print """SHOW CREATE {} {}.{};""".format(proctype, database,  proc)
+    cur.execute("""SHOW CREATE TABLE {}.{};""".format(database,  table))
+    f = 'Create Table'
+    pdef = cur.fetchall()[0][f]
     return pdef
 
 
@@ -204,12 +219,17 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
     tables = {}
     for table in tables_rows:
         tables[table['TABLE_NAME']] = table
+        table['CREATE'] = dump_table(cur, database_name, table['TABLE_NAME'])
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['REF_CONSTRAINTS'] = getitems('select * from REFERENTIAL_CONSTRAINTS where constraint_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
         table['FOREIGN_KEYS'] = getitems('select CONSTRAINT_NAME , column_name,  referenced_table_name, referenced_column_name from key_column_usage where referenced_table_name is not null and table_schema = %s and table_name = %s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME');
         table['INDEXES'] = getindexes('SHOW INDEX FROM {}.{}'.format(database_name, table['TABLE_NAME']),[], cur, 'Key_name')
+        for trigger in table['TRIGGERS']:
+            table['TRIGGERS'][trigger]['CREATE'] = dump_trigger(cur, database_name, trigger)
+
+
 
 
         cur.execute('select * from routines where routine_schema=%s', [database_name])
