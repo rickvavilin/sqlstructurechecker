@@ -15,6 +15,7 @@ default_ignore = [[u'TABLES', u'CREATE_TIME'],
               [u'TABLES', u'UPDATE_TIME'],
               [u'TABLES', u'TABLE_SCHEMA'],
               [u'TABLES', u'COLUMNS', u'DATETIME_PRECISION'],
+              [u'TABLES', u'COLUMNS', u'PREVIOUS'],
               [u'TABLES', u'TRIGGERS', u'TRIGGER_SCHEMA'],
               [u'TABLES', u'TRIGGERS', u'EVENT_OBJECT_SCHEMA'],
               [u'TABLES', u'COLUMNS', u'TABLE_SCHEMA'],
@@ -221,6 +222,7 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
         tables[table['TABLE_NAME']] = table
         table['CREATE'] = dump_table(cur, database_name, table['TABLE_NAME'])
         table['COLUMNS'] = getitems('select * from columns where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'COLUMN_NAME')
+
         table['CONSTRAINTS'] = getitems('select * from TABLE_CONSTRAINTS where table_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['REF_CONSTRAINTS'] = getitems('select * from REFERENTIAL_CONSTRAINTS where constraint_schema=%s and table_name=%s', [database_name, table['TABLE_NAME']], cur, 'CONSTRAINT_NAME')
         table['TRIGGERS'] = getitems('select * from TRIGGERS where event_object_schema=%s and event_object_table=%s', [database_name, table['TABLE_NAME']], cur, 'TRIGGER_NAME')
@@ -228,6 +230,14 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
         table['INDEXES'] = getindexes('SHOW INDEX FROM {}.{}'.format(database_name, table['TABLE_NAME']),[], cur, 'Key_name')
         for trigger in table['TRIGGERS']:
             table['TRIGGERS'][trigger]['CREATE'] = dump_trigger(cur, database_name, trigger)
+        for column in table['COLUMNS']:
+            if table['COLUMNS'][column]['ORDINAL_POSITION']>1:
+                for c in table['COLUMNS']:
+                    if table['COLUMNS'][c]['ORDINAL_POSITION']==table['COLUMNS'][column]['ORDINAL_POSITION']-1:
+                        table['COLUMNS'][column]['PREVIOUS'] = c
+
+            else:
+                table['COLUMNS'][column]['PREVIOUS'] = None
 
 
 

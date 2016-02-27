@@ -77,7 +77,8 @@ def compare(loaded_struct, parsed_struct):
 
                 after = ''
                 if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'ORDINAL_POSITION']:
-                    pass
+                    if col_define['PREVIOUS'] is not None:
+                        after = ' AFTER {0}'.format(col_define['PREVIOUS'])
 
 
                 notnull = u''
