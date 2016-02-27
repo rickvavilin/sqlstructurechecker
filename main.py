@@ -17,6 +17,7 @@ def compare_file_vs_database(args):
 def compare(loaded_struct, parsed_struct):
     ignore = sqlcomparer.default_ignore
     alters = []
+    modify_column_alters = {}
     idx_alters = []
     proc_alters = []
     d = sqlcomparer.Differ()
@@ -45,6 +46,9 @@ def compare(loaded_struct, parsed_struct):
                 default = ''
                 if col_define[u'COLUMN_DEFAULT'] is not None:
                     default = 'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
+                if col_define[u'EXTRA']=='auto_increment':
+                    default = u'AUTO_INCREMENT'
+
 
                 charset = ''
                 if col_define[u'CHARACTER_SET_NAME'] is not None:
@@ -76,7 +80,7 @@ def compare(loaded_struct, parsed_struct):
                 col_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
 
                 after = ''
-                if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'ORDINAL_POSITION']:
+                if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'PREVIOUS']:
                     if col_define['PREVIOUS'] is not None:
                         after = ' AFTER {0}'.format(col_define['PREVIOUS'])
 
@@ -87,7 +91,7 @@ def compare(loaded_struct, parsed_struct):
                 default = u''
                 if col_define[u'COLUMN_DEFAULT'] is not None:
                     default = u'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
-                if col_define[u'EXTRA']=='auto_increment':
+                if col_define[u'EXTRA'] == 'auto_increment':
                     default = u'AUTO_INCREMENT'
 
                 charset = u''
@@ -97,8 +101,11 @@ def compare(loaded_struct, parsed_struct):
                 if col_define[u'COLLATION_NAME'] is not None:
                     collate = u'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
                 a = u'ALTER TABLE {} MODIFY COLUMN {} {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default, after)
-                if a not in alters:
-                    alters.append(a)
+                if diff['keyschain'][1] not in modify_column_alters:
+                    modify_column_alters[diff['keyschain'][1]] = []
+                alt = {'statement':a, 'column':diff['keyschain'][3], 'order': col_define[u'ORDINAL_POSITION']}
+                if alt not in modify_column_alters[diff['keyschain'][1]]:
+                    modify_column_alters[diff['keyschain'][1]].append(alt)
 
         if diff['keyschain'][0::2][:2] == [u'TABLES', u'INDEXES']:
             idx_define = parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
@@ -206,6 +213,14 @@ def compare(loaded_struct, parsed_struct):
     alters_f = codecs.open('./alters.sql','w', encoding='utf-8')
     for alter in alters:
         alters_f.write(alter+u'\n')
+
+
+    for alter in modify_column_alters:
+        t_alters = modify_column_alters[alter]
+        for a in sorted(t_alters, key=lambda x: x['order']):
+            print alter, a
+            alters_f.write(a['statement']+u'\n')
+
     for alter in idx_alters:
         alters_f.write(alter+u'\n')
     for alter in proc_alters:
