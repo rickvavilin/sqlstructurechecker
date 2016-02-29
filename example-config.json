@@ -1,15 +1,15 @@
 {
-  "reference":{
+  "target":{
     "type": "dir",
-    "dir": "/home/rick/work/AzimuthDB/1.0.0",
-    "database": "odissey"
+    "dir": "/foo/bar",
+    "database": ""
   },
-  "instance":{
+  "source":{
     "type": "db",
-    "host": "192.168.24.160",
+    "host": "192.168.0.1",
     "username": "root",
-    "password": "2360087",
-    "database": "odissey"
+    "password": "",
+    "database": ""
   },
   "ignore":[
       "violations",

@@ -20,79 +20,79 @@ if __name__=='__main__':
     if len(sys.argv)>1:
         config_name = sys.argv[1]
     config = json.load(open(config_name, 'r'))
-    reference_config = config['reference']
-    instance_config = config['instance']
-    if 'port' not in reference_config:
-        reference_config['port'] = 3306
-    if 'port' not in instance_config:
-        instance_config['port'] = 3306
-    tmp_reference_db = reference_config['database']+'_reference'
-    tmp_instance_db = instance_config['database']+'_instance'
-    reference_workingdir = os.path.join(workdir, 'reference')
-    instance_workingdir = os.path.join(workdir, 'instance')
-    shutil.rmtree(reference_workingdir, ignore_errors=True)
-    shutil.rmtree(instance_workingdir, ignore_errors=True)
-    if 'type' not in reference_config or reference_config['type'] == 'db':
-        reference_d = dumprestore.MyDumpRestore(reference_config['host'],
-                                      reference_config['username'],
-                                      reference_config['password'],
-                                      reference_workingdir,
-                                      reference_config['database'],
-                                      port=reference_config['port'],
-                                      ignore=config['ignore'])
-        reference_d.dump()
-    elif reference_config['type'] == 'dir':
-        shutil.copytree(reference_config['dir'], reference_workingdir)
+    target_config = config['target']
+    source_config = config['source']
+    if 'port' not in target_config:
+        target_config['port'] = 3306
+    if 'port' not in source_config:
+        source_config['port'] = 3306
+    tmp_target_db = target_config['database'] + '_target'
+    tmp_source_db = source_config['database'] + '_source'
+    target_workingdir = os.path.join(workdir, 'target')
+    source_workingdir = os.path.join(workdir, 'source')
+    shutil.rmtree(target_workingdir, ignore_errors=True)
+    shutil.rmtree(source_workingdir, ignore_errors=True)
+    if 'type' not in target_config or target_config['type'] == 'db':
+        target_d = dumprestore.MyDumpRestore(target_config['host'],
+                                             target_config['username'],
+                                             target_config['password'],
+                                             target_workingdir,
+                                             target_config['database'],
+                                             port=target_config['port'],
+                                             ignore=config['ignore'])
+        target_d.dump()
+    elif target_config['type'] == 'dir':
+        shutil.copytree(target_config['dir'], target_workingdir)
     else:
-        raise Exception("reference dbtype {} incorrect".format(reference_config['type']))
+        raise Exception("target dbtype {} incorrect".format(target_config['type']))
 
-    if 'type' not in instance_config or instance_config['type'] == 'db':
-        instance_d = dumprestore.MyDumpRestore(instance_config['host'],
-                                      instance_config['username'],
-                                      instance_config['password'],
-                                      instance_workingdir,
-                                      instance_config['database'],
-                                      port=instance_config['port'],
-                                      ignore=config['ignore'])
-        instance_d.dump()
-    elif instance_config['type'] == 'dir':
-        shutil.copytree(instance_config['dir'], instance_workingdir)
+    if 'type' not in source_config or source_config['type'] == 'db':
+        source_d = dumprestore.MyDumpRestore(source_config['host'],
+                                             source_config['username'],
+                                             source_config['password'],
+                                             source_workingdir,
+                                             source_config['database'],
+                                             port=source_config['port'],
+                                             ignore=config['ignore'])
+        source_d.dump()
+    elif source_config['type'] == 'dir':
+        shutil.copytree(source_config['dir'], source_workingdir)
     else:
-        raise Exception("instance dbtype {} incorrect".format(instance_config['type']))
+        raise Exception("instance dbtype {} incorrect".format(source_config['type']))
 
 
 
-    reference_d = dumprestore.MyDumpRestore(tmp_db_host,
-                                  tmp_db_user,
-                                  tmp_db_password,
-                                  reference_workingdir,
-                                  tmp_reference_db,
-                                  ignore=config['ignore'])
-    instance_d = dumprestore.MyDumpRestore(tmp_db_host,
-                                  tmp_db_user,
-                                  tmp_db_password,
-                                  instance_workingdir,
-                                  tmp_instance_db,
-                                  ignore=config['ignore'])
-    reference_d.restore()
-    instance_d.restore()
-    reference_d.db.close()
-    instance_d.db.close()
+    target_d = dumprestore.MyDumpRestore(tmp_db_host,
+                                         tmp_db_user,
+                                         tmp_db_password,
+                                         target_workingdir,
+                                         tmp_target_db,
+                                         ignore=config['ignore'])
+    source_d = dumprestore.MyDumpRestore(tmp_db_host,
+                                         tmp_db_user,
+                                         tmp_db_password,
+                                         source_workingdir,
+                                         tmp_source_db,
+                                         ignore=config['ignore'])
+    target_d.restore()
+    source_d.restore()
+    target_d.db.close()
+    source_d.db.close()
 
-    sqlcomparer.savestructure(os.path.join(workdir, 'reference.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_reference_db))
-    sqlcomparer.savestructure(os.path.join(workdir, 'instance.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_instance_db))
-    c = sqlcomparer.Comparer(sqlcomparer.loadstructure(os.path.join(workdir, 'instance.json')),
-                             sqlcomparer.loadstructure(os.path.join(workdir, 'reference.json')))
+    sqlcomparer.savestructure(os.path.join(workdir, 'target.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_target_db))
+    sqlcomparer.savestructure(os.path.join(workdir, 'source.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_source_db))
+    c = sqlcomparer.Comparer(sqlcomparer.loadstructure(os.path.join(workdir, 'source.json')),
+                             sqlcomparer.loadstructure(os.path.join(workdir, 'target.json')))
     c.compare()
     c.dump_alters('./alters.sql')
     c.dump_formatted_diff('./initial_diff.txt')
     os.system("mysql -h%s -u%s -p%s -D%s --force < ./alters.sql" % (tmp_db_host,
-                                                            tmp_db_user,
-                                                            tmp_db_password,
-                                                            tmp_instance_db))
-    sqlcomparer.savestructure(os.path.join(workdir, 'instance_after_alter.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_instance_db))
-    c = sqlcomparer.Comparer(sqlcomparer.loadstructure(os.path.join(workdir, 'instance_after_alter.json')),
-                             sqlcomparer.loadstructure(os.path.join(workdir, 'reference.json')))
+                                                                    tmp_db_user,
+                                                                    tmp_db_password,
+                                                                    tmp_source_db))
+    sqlcomparer.savestructure(os.path.join(workdir, 'source_after_alter.json'), sqlcomparer.get_structure_from_database(tmp_db_host, tmp_db_user, tmp_db_password, database=tmp_source_db))
+    c = sqlcomparer.Comparer(sqlcomparer.loadstructure(os.path.join(workdir, 'source_after_alter.json')),
+                             sqlcomparer.loadstructure(os.path.join(workdir, 'target.json')))
     c.compare()
     c.dump_alters('./alters_last.sql')
     c.dump_formatted_diff('./final_diff.txt')
