@@ -11,7 +11,6 @@ if __name__=='__main__':
     workdir = './tmp'
     tmp_db_host = 'localhost'
     tmp_db_user = 'root'
-    tmp_db_password = '2360087'
     try:
         os.mkdir(workdir)
     except OSError:
@@ -20,6 +19,8 @@ if __name__=='__main__':
     if len(sys.argv)>1:
         config_name = sys.argv[1]
     config = json.load(open(config_name, 'r'))
+    tmp_db_password = config['tmp_database_password']
+
     target_config = config['target']
     source_config = config['source']
     if 'port' not in target_config:

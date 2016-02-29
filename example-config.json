@@ -23,5 +23,6 @@
       "violations_stat",
       "stat_by_impose",
       "fssp_upload"
-  ]
+  ],
+  "tmp_db_password":""
 }
