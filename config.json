@@ -1,0 +1,27 @@
+{
+  "reference":{
+    "host": "192.168.24.110",
+    "username": "root",
+    "password": "2360087",
+    "database": "odissey"
+  },
+  "instance":{
+    "host": "192.168.24.160",
+    "username": "root",
+    "password": "2360087",
+    "database": "odissey"
+  },
+  "ignore":[
+      "violations",
+      "fragments",
+      "not_imposed_stat",
+      "log_user_actions",
+      "proc_log",
+      "post_batches",
+      "operation_log",
+      "operation_stages",
+      "violations_stat",
+      "stat_by_impose",
+      "fssp_upload"
+  ]
+}

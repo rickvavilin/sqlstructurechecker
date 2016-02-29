@@ -3,6 +3,7 @@ from MySQLdb import connect, cursors
 import copy
 from datetime import datetime
 import json
+import codecs
 
 default_ignore = [[u'TABLES', u'CREATE_TIME'],
               [u'TABLES', u'CREATE'],
@@ -235,7 +236,6 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
                 for c in table['COLUMNS']:
                     if table['COLUMNS'][c]['ORDINAL_POSITION']==table['COLUMNS'][column]['ORDINAL_POSITION']-1:
                         table['COLUMNS'][column]['PREVIOUS'] = c
-
             else:
                 table['COLUMNS'][column]['PREVIOUS'] = None
 
@@ -260,3 +260,236 @@ def get_structure_from_database(host='localhost', user='root', passwd='2360087',
 
     db.close()
     return normalize({u'TABLES': tables, u'ROUTINES': routines, u'VIEWS': views})
+
+
+class Comparer(object):
+
+    def __init__(self, loaded_struct, parsed_struct, ignore=default_ignore):
+        self.loaded_struct = loaded_struct
+        self.parsed_struct = parsed_struct
+        self.ignore = ignore
+        self.all_alters = []
+        self.formatted_diff = []
+
+    def compare(self):
+        alters = []
+        modify_column_alters = {}
+        idx_alters = []
+        proc_alters = []
+        d = Differ()
+        d.structdiff(self.loaded_struct, self.parsed_struct)
+
+        filtered_diffs = d.filtereddiff(self.ignore)
+        #if len(filtered_diffs) == 0:
+        #    print 'No differences found'
+
+        for diff in filtered_diffs:
+            if diff['keyschain'][0::2][:2] == [u'TABLES']:
+                if diff['difftype']==u'removed':
+                    a = 'DROP TABLE {};'.format(diff['keyschain'][1])
+                    if a not in alters:
+                        alters.append(a)
+                if diff['difftype']==u'added':
+                    alters.append(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']+';')
+
+            if diff['keyschain'][0::2][:2] == [u'TABLES', u'COLUMNS'] \
+                    and diff['keyschain'][0::2][:3] != [u'TABLES', u'COLUMNS', u'COLUMN_KEY']:
+                if diff['difftype']==u'added':
+                    col_define = self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+                    notnull = ''
+                    if col_define[u'IS_NULLABLE']==u'NO':
+                        notnull = 'NOT NULL'
+                    default = ''
+                    if col_define[u'COLUMN_DEFAULT'] is not None:
+                        default = 'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
+                    if col_define[u'EXTRA']=='auto_increment':
+                        default = u'AUTO_INCREMENT'
+
+
+                    charset = ''
+                    if col_define[u'CHARACTER_SET_NAME'] is not None:
+                        charset = 'CHARACTER SET {}'.format(col_define[u'CHARACTER_SET_NAME'])
+                    collate = ''
+                    if col_define[u'COLLATION_NAME'] is not None:
+                        collate = 'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
+
+                    #print col_define
+                    a = 'ALTER TABLE {} ADD COLUMN {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default)
+                    if a not in alters:
+                        alters.append(a)
+
+                if diff['difftype']==u'removed':
+                    a = u'ALTER TABLE {} DROP COLUMN {};'.format(diff['keyschain'][1], diff['keyschain'][3])
+                    if a not in alters:
+                        alters.append(a)
+
+                if diff['difftype']==u'differ':
+                    col_define = self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+
+                    after = ''
+                    if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'PREVIOUS']:
+                        if col_define['PREVIOUS'] is not None:
+                            after = ' AFTER {0}'.format(col_define['PREVIOUS'])
+
+
+                    notnull = u''
+                    if col_define[u'IS_NULLABLE']==u'NO':
+                        notnull = u'NOT NULL'
+                    default = u''
+                    if col_define[u'COLUMN_DEFAULT'] is not None:
+                        default = u'DEFAULT "{}"'.format(col_define[u'COLUMN_DEFAULT'])
+                    if col_define[u'EXTRA'] == 'auto_increment':
+                        default = u'AUTO_INCREMENT'
+
+                    charset = u''
+                    if col_define[u'CHARACTER_SET_NAME'] is not None:
+                        charset = u'CHARACTER SET {}'.format(col_define[u'CHARACTER_SET_NAME'])
+                    collate = u''
+                    if col_define[u'COLLATION_NAME'] is not None:
+                        collate = u'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
+                    a = u'ALTER TABLE {} MODIFY COLUMN {} {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default, after)
+                    if diff['keyschain'][1] not in modify_column_alters:
+                        modify_column_alters[diff['keyschain'][1]] = []
+                    alt = {'statement':a, 'column':diff['keyschain'][3], 'order': col_define[u'ORDINAL_POSITION']}
+                    if alt not in modify_column_alters[diff['keyschain'][1]]:
+                        modify_column_alters[diff['keyschain'][1]].append(alt)
+
+            if diff['keyschain'][0::2][:2] == [u'TABLES', u'INDEXES']:
+                if diff['difftype']==u'added' or diff['difftype']==u'differ':
+                    idx_define = self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+                    unique = ''
+                    if idx_define['Non_unique']==0:
+                         unique = 'UNIQUE'
+
+                if diff['difftype']==u'added':
+                    a = u'ALTER TABLE {} ADD {} KEY {} ({});'.format(diff['keyschain'][1], unique, diff['keyschain'][3], ', '.join(idx_define['COLUMNS']))
+                    if a not in idx_alters:
+                        idx_alters.append(a)
+
+                if diff['difftype']==u'differ':
+                    a = u'ALTER TABLE {} DROP KEY {};'.format(diff['keyschain'][1], diff['keyschain'][3])
+                    if a not in alters:
+                        idx_alters.append(a)
+
+                    a = u'ALTER TABLE {} ADD {} KEY {} ({});'.format(diff['keyschain'][1], unique, diff['keyschain'][3], ', '.join(idx_define['COLUMNS']))
+                    if a not in alters:
+                        idx_alters.append(a)
+                if diff['difftype']==u'removed':
+                    a = u'ALTER TABLE {} DROP KEY {};'.format(diff['keyschain'][1], diff['keyschain'][3])
+                    if a not in alters:
+                        idx_alters.append(a)
+
+
+
+            if diff['keyschain'][0::2][:2] == [u'TABLES', u'FOREIGN_KEYS']:
+                if diff['difftype']==u'added':
+                    const_define = self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
+                    a = u'ALTER TABLE {} ADD CONSTRAINT {} FOREIGN KEY ({}) REFERENCES {} ({});'.format(diff['keyschain'][1], diff['keyschain'][3], const_define['column_name'], const_define['referenced_table_name'], const_define['referenced_column_name'])
+                    if a not in alters:
+                        idx_alters.append('SET foreign_key_checks = 0;')
+                        idx_alters.append(a)
+                        idx_alters.append('SET foreign_key_checks = 1;')
+
+            if diff['keyschain'][0::2] == [u'ROUTINES'] and diff['difftype']==u'added':
+                try:
+                    #f2 = codecs.open('new/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
+                    #f2.write(unicode(diff['values'][1]))
+                    proc_alters.append(unicode(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
+                    #f2.write(unicode(parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
+                    #f2.close()
+                except Exception as e:
+                    print e
+
+
+            if diff['keyschain'][0::2] == [u'ROUTINES', u'ROUTINE_DEFINITION'] or diff['keyschain'][0::2] == [u'ROUTINES', u'CREATE']:
+                if diff['values'][0].replace('\x0D\x0A', '\x0A')!=diff['values'][1].replace('\x0D\x0A', '\x0A'):
+                    try:
+                        pass
+                        #f1 = codecs.open('old/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
+                        #f1.write(unicode(diff['values'][0]))
+                        #f1.write(unicode(loaded_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
+                        #f1.close()
+                    except Exception as e:
+                        print e
+
+                    try:
+                        #f2 = codecs.open('new/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
+                        #f2.write(unicode(diff['values'][1]))
+                        proc_alters.append(unicode(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
+                        #f2.write(unicode(parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']))
+                        #f2.close()
+                    except Exception as e:
+                        print e
+
+                else:
+                    continue
+
+            if diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS', u'ACTION_STATEMENT'] or diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS', u'CREATE']:
+                if diff['values'][0].replace('\x0D\x0A', '\x0A')!=diff['values'][1].replace('\x0D\x0A', '\x0A'):
+                    try:
+                        pass
+                        #f1 = codecs.open('old/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
+                        #f1.write(unicode(diff['values'][0]))
+                        #f1.write(unicode(loaded_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]['CREATE']))
+                        #f1.close()
+                    except Exception as e:
+                        print e
+
+                    try:
+                        #f2 = codecs.open('new/'+'_'.join(diff['keyschain'][1::2])+'.sql', 'wb', encoding='utf-8')
+                        #f2.write(unicode(diff['values'][1]))
+                        proc_alters.append(unicode(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]['CREATE']))
+                        #f2.write(unicode(parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]['CREATE']))
+                        #f2.close()
+                    except Exception as e:
+                        print e
+
+                else:
+                    continue
+
+            if diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS']:
+                if diff['difftype']==u'removed':
+                    print diff['keyschain']
+                    a = u'DROP TRIGGER IF EXISTS {};'.format(diff['keyschain'][3])
+                    proc_alters.append(a)
+
+            if diff['keyschain'][0::2] == [u'ROUTINES']:
+                if diff['difftype']==u'removed':
+                    routine_define = self.loaded_struct[diff['keyschain'][0]][diff['keyschain'][1]]
+                    a = u'DROP {} IF EXISTS {};'.format(routine_define['ROUTINE_TYPE'],diff['keyschain'][1])
+                    if a not in alters:
+                        alters.append(a)
+            self.formatted_diff.append(d.formatdiff(diff))
+
+        #alters_f = codecs.open('./alters.sql','w', encoding='utf-8')
+
+        for alter in alters:
+            self.all_alters.append(alter)
+
+        for alter in modify_column_alters:
+            t_alters = modify_column_alters[alter]
+            for a in sorted(t_alters, key=lambda x: x['order']):
+                self.all_alters.append(a['statement'])
+
+        for alter in idx_alters:
+            self.all_alters.append(alter)
+        for alter in proc_alters:
+            self.all_alters.append(alter)
+
+    def dump_alters(self, fd):
+        if isinstance(fd, (str, unicode)):
+            fd = codecs.open(fd, 'w', encoding='utf-8')
+        try:
+            for alter in self.all_alters:
+                fd.write(alter+u'\n')
+        finally:
+            fd.close()
+
+    def dump_formatted_diff(self, fd):
+        if isinstance(fd, (str, unicode)):
+            fd = codecs.open(fd, 'w', encoding='utf-8')
+        try:
+            for diff in self.formatted_diff:
+                fd.write(diff+u'\n')
+        finally:
+            fd.close()

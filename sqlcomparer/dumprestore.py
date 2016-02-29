@@ -133,7 +133,7 @@ class MyDumpRestore(object):
     def restore_views(self):
         self.apply_all(self.restore_obj, [path.join('views', i) for i in self.filelist('views')])
 
-    def restore(self, object, name='*'):
+    def restore(self, object='all', name='*'):
         if object == 'all':
             self.restore_tables()
             self.restore_procs()
@@ -193,7 +193,7 @@ class MyDumpRestore(object):
     def dump_views(self):
         self.apply_all(self.dump_view, self.viewlist())
 
-    def dump(self, object, name='*'):
+    def dump(self, object='all', name='*'):
         self.prepare_dirs()
         if object == 'all':
             self.dump_tables()
