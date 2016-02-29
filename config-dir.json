@@ -1,10 +1,7 @@
 {
   "reference":{
-    "type": "db",
-    "host": "127.0.0.1",
-    "username": "root",
-    "port": 3316,
-    "password": "2360087",
+    "type": "dir",
+    "dir": "/home/rick/work/AzimuthDB/1.0.0",
     "database": "odissey"
   },
   "instance":{

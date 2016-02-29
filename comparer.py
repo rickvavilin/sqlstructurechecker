@@ -3,9 +3,9 @@ import sqlcomparer
 from sqlcomparer import dumprestore
 import os
 import json
+import shutil
 import sys
-
-
+import paramiko
 
 if __name__=='__main__':
     workdir = './tmp'
@@ -16,7 +16,10 @@ if __name__=='__main__':
         os.mkdir(workdir)
     except OSError:
         pass
-    config = json.load(open('./config.json', 'r'))
+    config_name = './config-dir.json'
+    if len(sys.argv)>1:
+        config_name = sys.argv[1]
+    config = json.load(open(config_name, 'r'))
     reference_config = config['reference']
     instance_config = config['instance']
     if 'port' not in reference_config:
@@ -27,22 +30,37 @@ if __name__=='__main__':
     tmp_instance_db = instance_config['database']+'_instance'
     reference_workingdir = os.path.join(workdir, 'reference')
     instance_workingdir = os.path.join(workdir, 'instance')
-    reference_d = dumprestore.MyDumpRestore(reference_config['host'],
-                                  reference_config['username'],
-                                  reference_config['password'],
-                                  reference_workingdir,
-                                  reference_config['database'],
-                                  port=reference_config['port'],
-                                  ignore=config['ignore'])
-    instance_d = dumprestore.MyDumpRestore(instance_config['host'],
-                                  instance_config['username'],
-                                  instance_config['password'],
-                                  instance_workingdir,
-                                  instance_config['database'],
-                                  port=instance_config['port'],
-                                  ignore=config['ignore'])
-    reference_d.dump()
-    instance_d.dump()
+    shutil.rmtree(reference_workingdir, ignore_errors=True)
+    shutil.rmtree(instance_workingdir, ignore_errors=True)
+    if 'type' not in reference_config or reference_config['type'] == 'db':
+        reference_d = dumprestore.MyDumpRestore(reference_config['host'],
+                                      reference_config['username'],
+                                      reference_config['password'],
+                                      reference_workingdir,
+                                      reference_config['database'],
+                                      port=reference_config['port'],
+                                      ignore=config['ignore'])
+        reference_d.dump()
+    elif reference_config['type'] == 'dir':
+        shutil.copytree(reference_config['dir'], reference_workingdir)
+    else:
+        raise Exception("reference dbtype {} incorrect".format(reference_config['type']))
+
+    if 'type' not in instance_config or instance_config['type'] == 'db':
+        instance_d = dumprestore.MyDumpRestore(instance_config['host'],
+                                      instance_config['username'],
+                                      instance_config['password'],
+                                      instance_workingdir,
+                                      instance_config['database'],
+                                      port=instance_config['port'],
+                                      ignore=config['ignore'])
+        instance_d.dump()
+    elif instance_config['type'] == 'dir':
+        shutil.copytree(instance_config['dir'], instance_workingdir)
+    else:
+        raise Exception("instance dbtype {} incorrect".format(instance_config['type']))
+
+
 
     reference_d = dumprestore.MyDumpRestore(tmp_db_host,
                                   tmp_db_user,
