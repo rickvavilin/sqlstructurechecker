@@ -19,7 +19,7 @@ if __name__=='__main__':
     if len(sys.argv)>1:
         config_name = sys.argv[1]
     config = json.load(open(config_name, 'r'))
-    tmp_db_password = config['tmp_database_password']
+    tmp_db_password = config['tmp_db_password']
 
     target_config = config['target']
     source_config = config['source']
@@ -39,9 +39,8 @@ if __name__=='__main__':
                                              target_config['password'],
                                              target_workingdir,
                                              target_config['database'],
-                                             port=target_config['port'],
-                                             ignore=config['ignore'])
-        target_d.dump()
+                                             port=target_config['port'])
+        target_d.dump('structure')
     elif target_config['type'] == 'dir':
         shutil.copytree(target_config['dir'], target_workingdir)
     else:
@@ -53,9 +52,8 @@ if __name__=='__main__':
                                              source_config['password'],
                                              source_workingdir,
                                              source_config['database'],
-                                             port=source_config['port'],
-                                             ignore=config['ignore'])
-        source_d.dump()
+                                             port=source_config['port'])
+        source_d.dump('structure')
     elif source_config['type'] == 'dir':
         shutil.copytree(source_config['dir'], source_workingdir)
     else:
@@ -67,14 +65,12 @@ if __name__=='__main__':
                                          tmp_db_user,
                                          tmp_db_password,
                                          target_workingdir,
-                                         tmp_target_db,
-                                         ignore=config['ignore'])
+                                         tmp_target_db)
     source_d = dumprestore.MyDumpRestore(tmp_db_host,
                                          tmp_db_user,
                                          tmp_db_password,
                                          source_workingdir,
-                                         tmp_source_db,
-                                         ignore=config['ignore'])
+                                         tmp_source_db)
     target_d.restore()
     source_d.restore()
     target_d.db.close()
