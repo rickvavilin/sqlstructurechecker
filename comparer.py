@@ -19,6 +19,10 @@ if __name__=='__main__':
     config = json.load(open('./config.json', 'r'))
     reference_config = config['reference']
     instance_config = config['instance']
+    if 'port' not in reference_config:
+        reference_config['port'] = 3306
+    if 'port' not in instance_config:
+        instance_config['port'] = 3306
     tmp_reference_db = reference_config['database']+'_reference'
     tmp_instance_db = instance_config['database']+'_instance'
     reference_workingdir = os.path.join(workdir, 'reference')
@@ -28,13 +32,15 @@ if __name__=='__main__':
                                   reference_config['password'],
                                   reference_workingdir,
                                   reference_config['database'],
-                                  config['ignore'])
+                                  port=reference_config['port'],
+                                  ignore=config['ignore'])
     instance_d = dumprestore.MyDumpRestore(instance_config['host'],
                                   instance_config['username'],
                                   instance_config['password'],
                                   instance_workingdir,
                                   instance_config['database'],
-                                  config['ignore'])
+                                  port=instance_config['port'],
+                                  ignore=config['ignore'])
     reference_d.dump()
     instance_d.dump()
 
@@ -43,13 +49,13 @@ if __name__=='__main__':
                                   tmp_db_password,
                                   reference_workingdir,
                                   tmp_reference_db,
-                                  config['ignore'])
+                                  ignore=config['ignore'])
     instance_d = dumprestore.MyDumpRestore(tmp_db_host,
                                   tmp_db_user,
                                   tmp_db_password,
                                   instance_workingdir,
                                   tmp_instance_db,
-                                  config['ignore'])
+                                  ignore=config['ignore'])
     reference_d.restore()
     instance_d.restore()
     reference_d.db.close()

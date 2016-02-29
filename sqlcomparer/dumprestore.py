@@ -8,8 +8,9 @@ __author__ = 'Aleksandr Vavilin'
 
 
 class MyDumpRestore(object):
-    def __init__(self, host, username, password, workingdir, database, ignore=None, autocreate = True):
+    def __init__(self, host, username, password, workingdir, database, port=3306, ignore=None, autocreate = True):
         self.host = host
+        self.port = int(port)
         self.username = username
         self.password = password
         self.workingdir = workingdir
@@ -26,14 +27,14 @@ class MyDumpRestore(object):
             self.connect_db()
 
     def create_database(self):
-        db = connect(host=self.host, user=self.username, passwd=self.password, local_infile=1)
+        db = connect(host=self.host, port=self.port, user=self.username, passwd=self.password, local_infile=1)
         cur = db.cursor()
         cur.execute('CREATE DATABASE {0} CHARACTER SET UTF8'.format(self.database))
         db.close()
 
 
     def connect_db(self):
-        self.db = connect(host=self.host, user=self.username, passwd=self.password, db=self.database, local_infile=1)
+        self.db = connect(host=self.host, port=self.port, user=self.username, passwd=self.password, db=self.database, local_infile=1)
 
     def tablelist(self):
         cur = self.db.cursor()
@@ -72,8 +73,8 @@ class MyDumpRestore(object):
 
     def dump_table(self, table):
         cur = self.prepare_cursor()
-        os.system("mysqldump --skip-comments -h%s -u%s -p%s -d -r%s/tables/%s.sql %s %s" % (
-        self.host, self.username, self.password, self.workingdir, table, self.database, table))
+        os.system("mysqldump --skip-comments -h%s -u%s -p%s -P%s -d -r%s/tables/%s.sql %s %s" % (
+        self.host, self.username, self.password, self.port, self.workingdir, table, self.database, table))
         # TODO use subprocess to control exitcode
         if table not in self.ignore:
             cur.execute("""DESCRIBE %s""" % table)
@@ -86,8 +87,8 @@ class MyDumpRestore(object):
 
     def dump_view(self, view):
         # TODO use subprocess to control exitcode
-        os.system("mysqldump --skip-comments -h%s -u%s -p%s -d -r%s/views/%s.sql %s %s" % (
-        self.host, self.username, self.password, self.workingdir, view, self.database, view))
+        os.system("mysqldump --skip-comments -h%s -u%s -p%s -P%s -d -r%s/views/%s.sql %s %s" % (
+        self.host, self.username, self.password, self.port, self.workingdir, view, self.database, view))
 
     def dump_proc(self, proc):
         cur = self.prepare_cursor()
@@ -106,9 +107,10 @@ class MyDumpRestore(object):
     def restore_table(self, table):
         cur = self.prepare_cursor()
         try:
-            os.system("mysql -h%s -u%s -p%s -D%s < %s/tables/%s.sql" % (self.host,
+            os.system("mysql -h%s -u%s -p%s -P%s -D%s < %s/tables/%s.sql" % (self.host,
                                                                         self.username,
                                                                         self.password,
+                                                                        self.port,
                                                                         self.database,
                                                                         self.workingdir,
                                                                         table))
@@ -122,8 +124,8 @@ class MyDumpRestore(object):
             print "Error: {0} restoring {1}".format(e, table)
 
     def restore_obj(self, filename):
-        os.system("mysql -h%s -u%s -p%s -D%s < %s.sql" % (
-        self.host, self.username, self.password, self.database, path.join(self.workingdir, filename)))
+        os.system("mysql -h%s -u%s -p%s -P%s -D%s < %s.sql" % (
+            self.host, self.username, self.password, self.port, self.database, path.join(self.workingdir, filename)))
 
     def restore_tables(self):
         self.apply_all(self.restore_table, self.filelist('tables'))
