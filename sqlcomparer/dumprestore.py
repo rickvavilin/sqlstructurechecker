@@ -20,15 +20,19 @@ class MyDumpRestore(object):
         filterwarnings('ignore', category = Warning)
 
         try:
-            self.create_db()
+            self.connect_db()
         except OperationalError as e:
-            db = connect(host=self.host, user=self.username, passwd=self.password, local_infile=1)
-            cur = db.cursor()
-            cur.execute('CREATE DATABASE {0} CHARACTER SET UTF8'.format(self.database))
-            db.close()
-            self.create_db()
+            self.create_database()
+            self.connect_db()
 
-    def create_db(self):
+    def create_database(self):
+        db = connect(host=self.host, user=self.username, passwd=self.password, local_infile=1)
+        cur = db.cursor()
+        cur.execute('CREATE DATABASE {0} CHARACTER SET UTF8'.format(self.database))
+        db.close()
+
+
+    def connect_db(self):
         self.db = connect(host=self.host, user=self.username, passwd=self.password, db=self.database, local_infile=1)
 
     def tablelist(self):
@@ -134,6 +138,11 @@ class MyDumpRestore(object):
         self.apply_all(self.restore_obj, [path.join('views', i) for i in self.filelist('views')])
 
     def restore(self, object='all', name='*'):
+        cur = self.prepare_cursor()
+        cur.execute('DROP DATABASE IF EXISTS {0}'.format(self.database))
+        self.db.close()
+        self.create_database()
+        self.connect_db()
         if object == 'all':
             self.restore_tables()
             self.restore_procs()

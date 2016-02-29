@@ -291,6 +291,9 @@ class Comparer(object):
                         alters.append(a)
                 if diff['difftype']==u'added':
                     alters.append(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['CREATE']+';')
+                    for tr in self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['TRIGGERS']:
+                        proc_alters.append(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]]['TRIGGERS'][tr]['CREATE'])
+
 
             if diff['keyschain'][0::2][:2] == [u'TABLES', u'COLUMNS'] \
                     and diff['keyschain'][0::2][:3] != [u'TABLES', u'COLUMNS', u'COLUMN_KEY']:
@@ -312,11 +315,20 @@ class Comparer(object):
                     collate = ''
                     if col_define[u'COLLATION_NAME'] is not None:
                         collate = 'COLLATE {}'.format(col_define[u'COLLATION_NAME'])
+                    after = ''
+                    if col_define['PREVIOUS'] is not None:
+                        after = ' AFTER {0}'.format(col_define['PREVIOUS'])
 
                     #print col_define
-                    a = 'ALTER TABLE {} ADD COLUMN {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default)
-                    if a not in alters:
-                        alters.append(a)
+                    a = 'ALTER TABLE {} ADD COLUMN {} {} {} {} {} {} {};'.format(diff['keyschain'][1], diff['keyschain'][3], col_define[u'COLUMN_TYPE'], charset, collate, notnull, default, after)
+                    #if a not in alters:
+                    #    alters.append(a)
+                    if diff['keyschain'][1] not in modify_column_alters:
+                        modify_column_alters[diff['keyschain'][1]] = []
+                    alt = {'statement':a, 'column':diff['keyschain'][3], 'order': col_define[u'ORDINAL_POSITION']}
+                    if alt not in modify_column_alters[diff['keyschain'][1]]:
+                        modify_column_alters[diff['keyschain'][1]].append(alt)
+
 
                 if diff['difftype']==u'removed':
                     a = u'ALTER TABLE {} DROP COLUMN {};'.format(diff['keyschain'][1], diff['keyschain'][3])
@@ -327,9 +339,9 @@ class Comparer(object):
                     col_define = self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]
 
                     after = ''
-                    if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'PREVIOUS']:
-                        if col_define['PREVIOUS'] is not None:
-                            after = ' AFTER {0}'.format(col_define['PREVIOUS'])
+                    #if diff['keyschain'][0::2][:3] == [u'TABLES', u'COLUMNS', u'PREVIOUS']:
+                    if col_define['PREVIOUS'] is not None:
+                        after = ' AFTER {0}'.format(col_define['PREVIOUS'])
 
 
                     notnull = u''
@@ -448,10 +460,11 @@ class Comparer(object):
                     continue
 
             if diff['keyschain'][0::2] == [u'TABLES', u'TRIGGERS']:
-                if diff['difftype']==u'removed':
-                    print diff['keyschain']
+                if diff['difftype'] == u'removed':
                     a = u'DROP TRIGGER IF EXISTS {};'.format(diff['keyschain'][3])
                     proc_alters.append(a)
+                if diff['difftype'] == u'added':
+                    proc_alters.append(unicode(self.parsed_struct[diff['keyschain'][0]][diff['keyschain'][1]][diff['keyschain'][2]][diff['keyschain'][3]]['CREATE']))
 
             if diff['keyschain'][0::2] == [u'ROUTINES']:
                 if diff['difftype']==u'removed':

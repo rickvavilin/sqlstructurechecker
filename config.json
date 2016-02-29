@@ -1,12 +1,12 @@
 {
   "reference":{
-    "host": "192.168.24.110",
+    "host": "192.168.24.160",
     "username": "root",
     "password": "2360087",
     "database": "odissey"
   },
   "instance":{
-    "host": "192.168.24.160",
+    "host": "192.168.24.110",
     "username": "root",
     "password": "2360087",
     "database": "odissey"
