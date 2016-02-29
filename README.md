@@ -5,7 +5,6 @@
 
 * Scripts for SQL schemas compare and generate alters
 
-
 ### Использование ###
 1. Создать файл config.json
 
